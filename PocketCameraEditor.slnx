@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="PocketCameraEditor/PocketCameraEditor.vcxproj" Id="39345eb5-ef35-423a-8be5-b2caea5e16a0" />
+</Solution>
