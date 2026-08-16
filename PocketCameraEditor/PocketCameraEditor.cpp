@@ -1,21 +1,126 @@
-﻿// PocketCameraEditor.cpp : このファイルには 'main' 関数が含まれています。プログラム実行の開始と終了がそこで行われます。
-//
+﻿/***********************************************************************************
+ * PocketCameraEditor.cpp : "main" function of the PocketCameraEditor application.
+ ***********************************************************************************/
+#include "PocketCameraConverter.h"
+#include "Texture.h"
+#include <glad/glad.h>
 
-#include <iostream>
+#define GLFW_INCLUDE_NONE
+#include "GLFW/glfw3.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
+#include <cstdio>
+
+static void glfw_error_callback(int error, const char* description)
+{
+    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+}
 
 int main()
 {
-    std::cout << "Hello World!\n";
-    std::cout << "This is a project for PocketCameraEditor.\n";
+    int currentIndex = 0;
+    int scale = 4;
+    ImVec2 scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
+
+    glfwSetErrorCallback(glfw_error_callback);
+    if (!glfwInit())
+        return 1;
+
+    // OpenGL 3.3 Core
+    const char* glsl_version = "#version 330";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "PocketCameraEditor", nullptr, nullptr);
+    if (window == nullptr)
+    {
+        glfwTerminate();
+        return 1;
+    }
+    glfwMakeContextCurrent(window);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        glfwTerminate();
+        return 1;
+    }
+    glfwSwapInterval(1); // vsync
+    
+    IMGUI_CHECKVERSION();
+    // ImGui::CreateContext() creates a new Dear ImGui context. This function must be called before using any Dear ImGui functions. 
+    // It initializes the internal state of Dear ImGui and prepares it for use. 
+    // The context is stored in a global variable, and you can retrieve it later using ImGui::GetCurrentContext() if needed.
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    (void)io;
+    
+    ImGui::StyleColorsDark();
+    
+    // Function for Initializeing ImGui backends.
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+    
+    ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
+    
+    // Convert a PocketCamera .sav file to RGBA buffers.
+    PocketCameraConverter converter;
+    // [NOTE] This is hardcoded for testing purposes. This may be changed.
+    if (!converter.LoadFromFile("../../tmp/pcktcmr-test.sav"))
+    {
+        fprintf(stderr, "Failed to load PocketCamera file!\n");
+        // [NOTE] This should not be fatal, but for now we will just exit.
+        glfwTerminate();
+        return 1;
+
+    }
+    {
+        Texture texture;
+        
+        texture.Upload(converter.DecodeImage(currentIndex), PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight);
+
+        while (!glfwWindowShouldClose(window))
+        {
+            glfwPollEvents();
+
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+
+            ImGui::NewFrame();
+
+            // Show the image viewer window with the current image index and scale.
+            ImGui::Begin("Viewer");
+            if (ImGui::SliderInt("Image Index", &currentIndex, 0, PocketCameraConverter::kMaxImageCount - 1))
+            {
+                texture.Upload(converter.DecodeImage(currentIndex), PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight);
+            }
+            if (ImGui::SliderInt("Scale", &scale, 1, 8))
+            {
+                scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
+            }
+            ImGui::Image(ImTextureID(texture.GetId()), scaledSize);
+            ImGui::End();
+
+            ImGui::Render();
+
+            int display_w, display_h;
+            glfwGetFramebufferSize(window, &display_w, &display_h);
+            glViewport(0, 0, display_w, display_h);
+            glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            glfwSwapBuffers(window);
+        }
+    }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    return 0;
 }
-
-// プログラムの実行: Ctrl + F5 または [デバッグ] > [デバッグなしで開始] メニュー
-// プログラムのデバッグ: F5 または [デバッグ] > [デバッグの開始] メニュー
-
-// 作業を開始するためのヒント: 
-//    1. ソリューション エクスプローラー ウィンドウを使用してファイルを追加/管理します 
-//   2. チーム エクスプローラー ウィンドウを使用してソース管理に接続します
-//   3. 出力ウィンドウを使用して、ビルド出力とその他のメッセージを表示します
-//   4. エラー一覧ウィンドウを使用してエラーを表示します
-//   5. [プロジェクト] > [新しい項目の追加] と移動して新しいコード ファイルを作成するか、[プロジェクト] > [既存の項目の追加] と移動して既存のコード ファイルをプロジェクトに追加します
-//   6. 後ほどこのプロジェクトを再び開く場合、[ファイル] > [開く] > [プロジェクト] と移動して .sln ファイルを選択します
