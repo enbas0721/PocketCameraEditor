@@ -1,8 +1,0 @@
-{
-  "name": "pocket-camera-editor",
-  "version": "0.1.0",
-  "dependencies": [
-    "glfw3",
-    { "name": "imgui", "features": ["glfw-binding", "opengl3-binding"] }
-  ]
-}
