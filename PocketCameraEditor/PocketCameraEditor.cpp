@@ -20,9 +20,14 @@ static void glfw_error_callback(int error, const char* description)
 
 int main()
 {
+    int i;
     int currentIndex = 0;
     int scale = 4;
     ImVec2 scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
+    const char* filepath = "../../tmp/pcktcmr-test2.sav";
+
+    int placed = 0;
+    bool show_deleted = true;
 
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -68,7 +73,7 @@ int main()
     // Convert a PocketCamera .sav file to RGBA buffers.
     PocketCameraConverter converter;
     // [NOTE] This is hardcoded for testing purposes. This may be changed.
-    if (!converter.LoadFromFile("../../tmp/pcktcmr-test.sav"))
+    if (!converter.LoadFromFile(filepath))
     {
         fprintf(stderr, "Failed to load PocketCamera file!\n");
         // [NOTE] This should not be fatal, but for now we will just exit.
@@ -77,9 +82,14 @@ int main()
 
     }
     {
-        Texture texture;
-        
-        texture.Upload(converter.DecodeImage(currentIndex), PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight);
+        std::vector<Texture> textures;
+        textures.reserve(PocketCameraConverter::kMaxImageCount);
+
+        for (i = 0; i < PocketCameraConverter::kMaxImageCount; ++i)
+        {
+            textures.emplace_back();
+            textures[i].Upload(converter.DecodeImage(i), PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight);
+        }
 
         while (!glfwWindowShouldClose(window))
         {
@@ -90,17 +100,37 @@ int main()
 
             ImGui::NewFrame();
 
+            ImGui::Begin("Library");
+            ImGui::Text("sav file Path: %s", filepath);
+			ImGui::Checkbox("Show Deleted", &show_deleted);
+            for (i = 0; i < PocketCameraConverter::kMaxImageCount; ++i)
+            {
+				if (!show_deleted && !converter.IsSlotActive(i))
+				{
+                    continue;
+				}
+
+                if (ImGui::ImageButton(("Image " + std::to_string(i)).c_str(), ImTextureID(textures[i].GetId()), ImVec2(PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight)))
+                {
+                    currentIndex = i;
+                }
+                if (placed % 3 != 2)
+                {
+                    ImGui::SameLine();
+                }
+                ++placed;
+            }
+            placed = 0;
+            ImGui::End();
+            
             // Show the image viewer window with the current image index and scale.
             ImGui::Begin("Viewer");
-            if (ImGui::SliderInt("Image Index", &currentIndex, 0, PocketCameraConverter::kMaxImageCount - 1))
-            {
-                texture.Upload(converter.DecodeImage(currentIndex), PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight);
-            }
+
             if (ImGui::SliderInt("Scale", &scale, 1, 8))
             {
                 scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
             }
-            ImGui::Image(ImTextureID(texture.GetId()), scaledSize);
+            ImGui::Image(ImTextureID(textures[currentIndex].GetId()), scaledSize);
             ImGui::End();
 
             ImGui::Render();
