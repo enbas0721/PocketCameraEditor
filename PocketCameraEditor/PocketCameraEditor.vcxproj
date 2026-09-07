@@ -146,12 +146,14 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ImageExporter.cpp" />
     <ClCompile Include="Palette.cpp" />
     <ClCompile Include="PocketCameraEditor.cpp" />
     <ClCompile Include="PocketCameraConverter.cpp" />
     <ClCompile Include="Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ImageExporter.h" />
     <ClInclude Include="Palette.h" />
     <ClInclude Include="PocketCameraConverter.h" />
     <ClInclude Include="Texture.h" />

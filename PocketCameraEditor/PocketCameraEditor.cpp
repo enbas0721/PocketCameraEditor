@@ -4,6 +4,7 @@
 #include "PocketCameraConverter.h"
 #include "Texture.h"
 #include "Palette.h"
+#include "ImageExporter.h"
 #include <glad/glad.h>
 
 #define GLFW_INCLUDE_NONE
@@ -16,6 +17,9 @@
 #include <vector>
 #include <string>
 #include <cassert>
+
+
+char saveStatus[256] = "";
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -35,8 +39,8 @@ static void RefreshTextures(std::vector<Texture>& textures, const std::vector<Po
 int main()
 {
 	int currentIndex = 0;
-	int scale = 4;
-	ImVec2 scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
+	int saveScale = 4;
+	const ImVec2 kViewerScaledSize = ImVec2(PocketCameraConverter::kImageWidth * 4, PocketCameraConverter::kImageHeight * 4);
 	const char* filepath = "../../tmp/pcktcmr-test2.sav";
 
 	bool hide_deleted = false;
@@ -164,11 +168,7 @@ int main()
 			// Show the image viewer window with the current image index and scale.
 			ImGui::Begin("Viewer");
 			{
-				if (ImGui::SliderInt("Scale", &scale, 1, 8))
-				{
-					scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
-				}
-				ImGui::Image(ImTextureID(textures[currentIndex].GetId()), scaledSize);
+				ImGui::Image(ImTextureID(textures[currentIndex].GetId()), kViewerScaledSize);
 			}
 			ImGui::End();
 
@@ -211,6 +211,43 @@ int main()
 				isNeedRefresh |= ImGui::ColorEdit3("Shade 1", currentPalette.colors[1]);
 				isNeedRefresh |= ImGui::ColorEdit3("Shade 2", currentPalette.colors[2]);
 				isNeedRefresh |= ImGui::ColorEdit3("Shade 3 (darkest)", currentPalette.colors[3]);
+			}
+			ImGui::End();
+
+			ImGui::Begin("Export Setting");
+			{
+				ImGui::SliderInt("Export Scale", &saveScale, 1, 8);
+				if (ImGui::Button("Save PNG"))
+				{
+					// Save the image.
+					char savePath[256];
+					snprintf(savePath, sizeof(savePath), "C:/tmp/slot_%02d_x%d.png", currentIndex + 1, saveScale);
+
+					std::vector<uint8_t> saveData = ApplyPalette(textureIndices[currentIndex], currentPalette);
+					ExportImage finalImage = UpscaleNearest(
+						saveData,
+						PocketCameraConverter::kImageWidth,
+						PocketCameraConverter::kImageHeight,
+						saveScale
+					);
+					if (!finalImage.pixels.empty()) {
+						if (!SavePng(savePath, finalImage)) {
+							snprintf(saveStatus, sizeof(saveStatus), "Error: Failed to save PNG file: %s", savePath);
+						}
+						else
+						{
+							snprintf(saveStatus, sizeof(saveStatus), "Saved PNG file: %s", savePath);
+						}
+					}
+					else {
+						snprintf(saveStatus, sizeof(saveStatus), "Error: Failed to save PNG file: %s", savePath);
+					}
+				}
+				if (saveStatus[0] != '\0')
+				{
+					ImGui::Text("%s", saveStatus);
+				}
+
 			}
 			ImGui::End();
 
