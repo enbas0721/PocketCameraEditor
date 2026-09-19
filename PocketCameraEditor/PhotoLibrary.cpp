@@ -4,7 +4,7 @@ PhotoLibrary::PhotoLibrary()
 {
 }
 
-bool PhotoLibrary::Load(const char* path)
+bool PhotoLibrary::Load(const std::filesystem::path& path)
 {
 	if (!m_converter.LoadFromFile(path))
 	{

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 class PocketCameraConverter
 {
@@ -21,7 +22,7 @@ public:
 	using IndexBuffer = std::vector<uint8_t>;
 
 	// Loads the .sav file into memory. Fails if the size is not exactly 128KB.
-	bool LoadFromFile(const std::string& path);
+	bool LoadFromFile(const std::filesystem::path& path);
 
 	// Whether a file has been successfully loaded.
 	bool IsLoaded() const { return !m_data.empty(); }

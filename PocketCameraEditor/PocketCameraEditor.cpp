@@ -19,7 +19,7 @@
 #include <cstdio>
 #include <vector>
 #include <string>
-#include <cassert>
+#include <filesystem>
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -114,7 +114,8 @@ int main()
 					nfdresult_t result = NFD::OpenDialog(inPath, filters, 1);
 					if (result == NFD_OKAY)
 					{
-						if (!library.Load(inPath.get()))
+						std::filesystem::path loadPath(reinterpret_cast<const char8_t*>(inPath.get()));
+						if (!library.Load(loadPath))
 						{
 							fprintf(stderr, "Failed to load PocketCamera file!\n");
 						} else {

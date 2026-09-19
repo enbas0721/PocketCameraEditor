@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-bool PocketCameraConverter::LoadFromFile(const std::string& path)
+bool PocketCameraConverter::LoadFromFile(const std::filesystem::path& path)
 {
 	std::ifstream file(path, std::ios::binary | std::ios::ate);
 	if (!file)

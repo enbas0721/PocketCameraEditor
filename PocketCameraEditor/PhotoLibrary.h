@@ -5,6 +5,8 @@
 #include "Texture.h"
 #include "Palette.h"
 
+#include <filesystem>
+
 struct Slot
 {
 	PocketCameraConverter::IndexBuffer indices;
@@ -17,7 +19,7 @@ class PhotoLibrary
 {
 public:
 	PhotoLibrary();
-	bool Load(const char* path);
+	bool Load(const std::filesystem::path& path);
 	bool IsLoaded() const;
 	int SlotCount() const;
 	Slot& GetSlot(int index);
