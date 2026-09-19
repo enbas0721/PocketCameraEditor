@@ -5,6 +5,7 @@
 #include "Texture.h"
 #include "Palette.h"
 #include "ImageExporter.h"
+#include "PhotoLibrary.h"
 #include <glad/glad.h>
 
 #define GLFW_INCLUDE_NONE
@@ -13,27 +14,16 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include "nfd.hpp"
+
 #include <cstdio>
 #include <vector>
 #include <string>
 #include <cassert>
 
-
-char saveStatus[256] = "";
-
 static void glfw_error_callback(int error, const char* description)
 {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
-
-static void RefreshTextures(std::vector<Texture>& textures, const std::vector<PocketCameraConverter::IndexBuffer>& textureIndices, const Palette& palette)
-{
-	assert(textures.size() == textureIndices.size());
-
-	for (size_t i = 0; i < textures.size(); ++i)
-	{
-		textures[i].Upload(ApplyPalette(textureIndices[i], palette), PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight);
-	}
 }
 
 int main()
@@ -41,13 +31,25 @@ int main()
 	int currentIndex = 0;
 	int saveScale = 4;
 	const ImVec2 kViewerScaledSize = ImVec2(PocketCameraConverter::kImageWidth * 4, PocketCameraConverter::kImageHeight * 4);
-	const char* filepath = "../../tmp/pcktcmr-test2.sav";
+	
+	PhotoLibrary library;
+
+	char saveStatus[256] = "";
+	std::string currentFilePath = "No file loaded.";
 
 	bool hide_deleted = false;
 
 	glfwSetErrorCallback(glfw_error_callback);
 	if (!glfwInit())
 		return 1;
+
+	nfdresult_t result = NFD::Init();
+	if (result != NFD_OKAY)
+	{
+		fprintf(stderr, "Failed to initialize NFD!\n");
+		glfwTerminate();
+		return 1;
+	}
 
 	// OpenGL 3.3 Core
 	const char* glsl_version = "#version 330";
@@ -86,35 +88,11 @@ int main()
 
 	ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
 
-	// Convert a PocketCamera .sav file to RGBA buffers.
-	PocketCameraConverter converter;
-	// [NOTE] This is hardcoded for testing purposes. This may be changed.
-	if (!converter.LoadFromFile(filepath))
+	// Prepare the textures and index buffers for all images.
 	{
-		fprintf(stderr, "Failed to load PocketCamera file!\n");
-		// [NOTE] This should not be fatal, but for now we will just exit.
-		glfwTerminate();
-		return 1;
-	}
-
-	{
-		std::vector<PocketCameraConverter::IndexBuffer> textureIndices;
-		textureIndices.reserve(PocketCameraConverter::kMaxImageCount);
-
-		std::vector<Texture> textures;
-		textures.reserve(PocketCameraConverter::kMaxImageCount);
-
-		int presetId = 0;
-		Palette currentPalette = kPresets[presetId].palette;
-		// Refresh at first frame.
-		bool isNeedRefresh = true;
-
-		for (int i = 0; i < PocketCameraConverter::kMaxImageCount; ++i)
-		{
-			textureIndices.push_back(converter.DecodeIndices(i));
-			textures.emplace_back();
-		}
-
+		/**************************************
+		 * Main loop
+		 **************************************/
 		while (!glfwWindowShouldClose(window))
 		{
 			glfwPollEvents();
@@ -124,132 +102,183 @@ int main()
 
 			ImGui::NewFrame();
 
-			if (isNeedRefresh)
-			{
-				RefreshTextures(textures, textureIndices, currentPalette);
-				isNeedRefresh = false;
-			}
-
 			ImGui::Begin("Library");
 			{
 				int placed = 0;
 				char textImageButton[16];
 
-				ImGui::Text("sav file Path: %s", filepath);
-				ImGui::Checkbox("Hide Deleted", &hide_deleted);
-				for (int i = 0; i < PocketCameraConverter::kMaxImageCount; ++i)
+				if (ImGui::Button("Open File"))
 				{
-					// Skip rendering invalid images.
-					if (hide_deleted && !converter.IsSlotActive(i))
+					NFD::UniquePath inPath;
+					nfdfilteritem_t filters[1] = {{ "GameBoy Camera Save", "sav"}};
+					nfdresult_t result = NFD::OpenDialog(inPath, filters, 1);
+					if (result == NFD_OKAY)
 					{
-						continue;
-					}
-					snprintf(textImageButton, std::size(textImageButton), "Image %d", i);
-					if (ImGui::ImageButton(textImageButton, ImTextureID(textures[i].GetId()), ImVec2(PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight)))
-					{
-						currentIndex = i;
-					}
-					if (currentIndex == i)
-					{
-						const ImVec2 imageButtonMin = ImGui::GetItemRectMin();
-						const ImVec2 imageButtonMax = ImGui::GetItemRectMax();
-						ImDrawList* drawList = ImGui::GetWindowDrawList();
-						drawList->AddRect(imageButtonMin, imageButtonMax, IM_COL32(66, 150, 250, 255), 0.0f, 0, 5.0f);
-					}
-					if (placed % 3 != 2)
-					{
-						ImGui::SameLine();
-					}
-					++placed;
-				}
-			}
-			ImGui::End();
-
-			// Show the image viewer window with the current image index and scale.
-			ImGui::Begin("Viewer");
-			{
-				ImGui::Image(ImTextureID(textures[currentIndex].GetId()), kViewerScaledSize);
-			}
-			ImGui::End();
-
-			ImGui::Begin("Info");
-			{
-				ImGui::Text("Image slot: %d", currentIndex + 1);
-				int displayOrder = converter.GetSlotDisplayOrder(currentIndex);
-				if (displayOrder == -1)
-				{
-					ImGui::Text("Image slot display order: deleted");
-				}
-				else
-				{
-					ImGui::Text("Image slot display order: %d", displayOrder + 1);
-				}
-			}
-			ImGui::End();
-
-			ImGui::Begin("Palette");
-			{
-				if (ImGui::BeginCombo("Preset", kPresets[presetId].name))
-				{
-					for (int i = 0; i < static_cast<int>(std::size(kPresets)); ++i)
-					{
-						const bool isSelected = (presetId == i);
-						if (ImGui::Selectable(kPresets[i].name, isSelected))
+						if (!library.Load(inPath.get()))
 						{
-							presetId = i;
-							currentPalette = kPresets[presetId].palette;
-							isNeedRefresh = true;
+							fprintf(stderr, "Failed to load PocketCamera file!\n");
+						} else {
+							currentIndex = 0;
+							currentFilePath = inPath.get();
 						}
-						if (isSelected)
-						{
-							ImGui::SetItemDefaultFocus();
-						}
+						
 					}
-					ImGui::EndCombo();
+					else if (result == NFD_CANCEL)
+					{
+						// User canceled the open dialog, do nothing.
+					}
+					else
+					{
+						fprintf(stderr, "Error: %s\n", NFD::GetError());
+					}
 				}
-				isNeedRefresh |= ImGui::ColorEdit3("Shade 0 (lightest)", currentPalette.colors[0]);
-				isNeedRefresh |= ImGui::ColorEdit3("Shade 1", currentPalette.colors[1]);
-				isNeedRefresh |= ImGui::ColorEdit3("Shade 2", currentPalette.colors[2]);
-				isNeedRefresh |= ImGui::ColorEdit3("Shade 3 (darkest)", currentPalette.colors[3]);
+				ImGui::Text("Current File: %s", currentFilePath.c_str());
+				
+				if (library.IsLoaded()) {
+					ImGui::Checkbox("Hide Deleted", &hide_deleted);
+					for (int i = 0; i < library.SlotCount(); ++i)
+					{
+						Slot& slot = library.GetSlot(i);
+						// Skip rendering invalid images.
+						if (hide_deleted && !library.IsSlotActive(i))
+						{
+							continue;
+						}
+						snprintf(textImageButton, std::size(textImageButton), "Image %d", i);
+						if (ImGui::ImageButton(textImageButton, ImTextureID(slot.texture.GetId()), ImVec2(PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight)))
+						{
+							currentIndex = i;
+						}
+						if (currentIndex == i)
+						{
+							const ImVec2 imageButtonMin = ImGui::GetItemRectMin();
+							const ImVec2 imageButtonMax = ImGui::GetItemRectMax();
+							ImDrawList* drawList = ImGui::GetWindowDrawList();
+							drawList->AddRect(imageButtonMin, imageButtonMax, IM_COL32(66, 150, 250, 255), 0.0f, 0, 5.0f);
+						}
+						if (placed % 3 != 2)
+						{
+							ImGui::SameLine();
+						}
+						++placed;
+					}
+				}
 			}
 			ImGui::End();
 
-			ImGui::Begin("Export Setting");
+			if (library.IsLoaded())
 			{
-				ImGui::SliderInt("Export Scale", &saveScale, 1, 8);
-				if (ImGui::Button("Save PNG"))
+				// Show the image viewer window with the current image index and scale.
+				ImGui::Begin("Viewer");
 				{
-					// Save the image.
-					char savePath[256];
-					snprintf(savePath, sizeof(savePath), "C:/tmp/slot_%02d_x%d.png", currentIndex + 1, saveScale);
+					ImGui::Image(ImTextureID(library.GetSlot(currentIndex).texture.GetId()), kViewerScaledSize);
+				}
+				ImGui::End();
 
-					std::vector<uint8_t> saveData = ApplyPalette(textureIndices[currentIndex], currentPalette);
-					ExportImage finalImage = UpscaleNearest(
-						saveData,
-						PocketCameraConverter::kImageWidth,
-						PocketCameraConverter::kImageHeight,
-						saveScale
-					);
-					if (!finalImage.pixels.empty()) {
-						if (!SavePng(savePath, finalImage)) {
-							snprintf(saveStatus, sizeof(saveStatus), "Error: Failed to save PNG file: %s", savePath);
-						}
-						else
+				ImGui::Begin("Info");
+				{
+					ImGui::Text("Image slot: %d", currentIndex + 1);
+					int displayOrder = library.GetSlotDisplayOrder(currentIndex);
+					if (displayOrder == -1)
+					{
+						ImGui::Text("Image slot display order: deleted");
+					}
+					else
+					{
+						ImGui::Text("Image slot display order: %d", displayOrder + 1);
+					}
+				}
+				ImGui::End();
+
+				ImGui::Begin("Palette");
+				{
+					Slot& slot = library.GetSlot(currentIndex);
+					bool changed = false;
+					if (ImGui::BeginCombo("Preset", kPresets[slot.presetId].name))
+					{
+						for (int i = 0; i < static_cast<int>(std::size(kPresets)); ++i)
 						{
-							snprintf(saveStatus, sizeof(saveStatus), "Saved PNG file: %s", savePath);
+							const bool isSelected = (slot.presetId == i);
+							if (ImGui::Selectable(kPresets[i].name, isSelected))
+							{
+								slot.presetId = i;
+								slot.palette = kPresets[slot.presetId].palette;
+								changed = true;
+							}
+							if (isSelected)
+							{
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+					changed |= ImGui::ColorEdit3("Shade 0 (lightest)", slot.palette.colors[0]);
+					changed |= ImGui::ColorEdit3("Shade 1", slot.palette.colors[1]);
+					changed |= ImGui::ColorEdit3("Shade 2", slot.palette.colors[2]);
+					changed |= ImGui::ColorEdit3("Shade 3 (darkest)", slot.palette.colors[3]);
+
+					if (changed)
+					{
+						library.RefreshTexture(currentIndex);
+					}
+				}
+				ImGui::End();
+
+				ImGui::Begin("Export Setting");
+				{
+					ImGui::SliderInt("Export Scale", &saveScale, 1, 8);
+					if (ImGui::Button("Save PNG"))
+					{
+						// Save the image.
+						char saveDefaultPath[256];
+						snprintf(saveDefaultPath, sizeof(saveDefaultPath), "slot_%02d_x%d.png", currentIndex + 1, saveScale);
+
+						NFD::UniquePath outPath;
+						nfdfilteritem_t filters[1] = { { "PNG Image", "png"} };
+
+						nfdresult_t result = NFD::SaveDialog(outPath, filters, 1, nullptr, saveDefaultPath);
+
+						if (result == NFD_OKAY)
+						{
+							Slot& slot = library.GetSlot(currentIndex);
+							// Make save Image.
+							std::vector<uint8_t> saveData = ApplyPalette(slot.indices, slot.palette);
+							ExportImage finalImage = UpscaleNearest(
+								saveData,
+								PocketCameraConverter::kImageWidth,
+								PocketCameraConverter::kImageHeight,
+								saveScale
+							);
+							if (!finalImage.pixels.empty()) {
+								if (!SavePng(outPath.get(), finalImage)) {
+									snprintf(saveStatus, sizeof(saveStatus), "Error: Failed to Save Image: %s", outPath.get());
+								}
+								else
+								{
+									snprintf(saveStatus, sizeof(saveStatus), "Saved PNG file: %s", outPath.get());
+								}
+							}
+							else {
+								snprintf(saveStatus, sizeof(saveStatus), "Error: Failed to Convert Image: %s", outPath.get());
+							}
+						}
+						else if (result == NFD_CANCEL)
+						{
+							// User cancesled the save dialog, do nothing.
+						}
+						else if (result == NFD_ERROR)
+						{
+							snprintf(saveStatus, sizeof(saveStatus), "Error: %s", NFD::GetError());
 						}
 					}
-					else {
-						snprintf(saveStatus, sizeof(saveStatus), "Error: Failed to save PNG file: %s", savePath);
+					if (saveStatus[0] != '\0')
+					{
+						ImGui::Text("%s", saveStatus);
 					}
-				}
-				if (saveStatus[0] != '\0')
-				{
-					ImGui::Text("%s", saveStatus);
-				}
 
+				}
+				ImGui::End();
 			}
-			ImGui::End();
 
 			ImGui::Render();
 
@@ -267,7 +296,8 @@ int main()
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-
+	
+	NFD::Quit();
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	return 0;
