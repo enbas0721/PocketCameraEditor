@@ -1,8 +1,13 @@
-﻿/***********************************************************************************
+/***********************************************************************************
  * PocketCameraEditor.cpp : "main" function of the PocketCameraEditor application.
+ *
+ * Starts the libraries up, runs the frame loop, and hands each frame to the UI.
+ * The windows themselves live in AppUI.cpp.
  ***********************************************************************************/
-#include "PocketCameraConverter.h"
-#include "Texture.h"
+#include "AppContext.h"
+#include "AppState.h"
+#include "AppUI.h"
+
 #include <glad/glad.h>
 
 #define GLFW_INCLUDE_NONE
@@ -11,146 +16,53 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include <cstdio>
-
-static void glfw_error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
-
 int main()
 {
-    int i;
-    int currentIndex = 0;
-    int scale = 4;
-    ImVec2 scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
-    const char* filepath = "../../tmp/pcktcmr-test2.sav";
+	// Declaration order is shutdown order, reversed. Everything that touches the
+	// GL context must be declared after the window that owns it.
+	GlfwContext glfwContext;
+	if (!glfwContext.IsValid())
+		return 1;
 
-    int placed = 0;
-    bool show_deleted = true;
+	NfdContext nfdContext;
+	if (!nfdContext.IsValid())
+		return 1;
 
-    glfwSetErrorCallback(glfw_error_callback);
-    if (!glfwInit())
-        return 1;
+	AppWindow window(1280, 720, "PocketCameraEditor");
+	if (!window.IsValid())
+		return 1;
 
-    // OpenGL 3.3 Core
-    const char* glsl_version = "#version 330";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	ImGuiRuntime imguiRuntime(window.Get(), "#version 330");
 
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "PocketCameraEditor", nullptr, nullptr);
-    if (window == nullptr)
-    {
-        glfwTerminate();
-        return 1;
-    }
-    glfwMakeContextCurrent(window);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
-        glfwTerminate();
-        return 1;
-    }
-    glfwSwapInterval(1); // vsync
-    
-    IMGUI_CHECKVERSION();
-    // ImGui::CreateContext() creates a new Dear ImGui context. This function must be called before using any Dear ImGui functions. 
-    // It initializes the internal state of Dear ImGui and prepares it for use. 
-    // The context is stored in a global variable, and you can retrieve it later using ImGui::GetCurrentContext() if needed.
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-    
-    ImGui::StyleColorsDark();
-    
-    // Function for Initializeing ImGui backends.
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
-    
-    ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
-    
-    // Convert a PocketCamera .sav file to RGBA buffers.
-    PocketCameraConverter converter;
-    // [NOTE] This is hardcoded for testing purposes. This may be changed.
-    if (!converter.LoadFromFile(filepath))
-    {
-        fprintf(stderr, "Failed to load PocketCamera file!\n");
-        // [NOTE] This should not be fatal, but for now we will just exit.
-        glfwTerminate();
-        return 1;
+	// AppState owns the textures, so it has to be destroyed before ImGuiRuntime
+	// and AppWindow tear the GL context down.
+	AppState app;
 
-    }
-    {
-        std::vector<Texture> textures;
-        textures.reserve(PocketCameraConverter::kMaxImageCount);
+	// The classic Windows 98 desktop teal.
+	constexpr float kClearColor[4] = { 0.0f, 0.502f, 0.502f, 1.0f };
 
-        for (i = 0; i < PocketCameraConverter::kMaxImageCount; ++i)
-        {
-            textures.emplace_back();
-            textures[i].Upload(converter.DecodeImage(i), PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight);
-        }
+	while (!glfwWindowShouldClose(window.Get()))
+	{
+		glfwPollEvents();
 
-        while (!glfwWindowShouldClose(window))
-        {
-            glfwPollEvents();
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
 
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
+		DrawAppUI(app);
 
-            ImGui::NewFrame();
+		ImGui::Render();
 
-            ImGui::Begin("Library");
-            ImGui::Text("sav file Path: %s", filepath);
-			ImGui::Checkbox("Show Deleted", &show_deleted);
-            for (i = 0; i < PocketCameraConverter::kMaxImageCount; ++i)
-            {
-				if (!show_deleted && !converter.IsSlotActive(i))
-				{
-                    continue;
-				}
+		int displayWidth = 0;
+		int displayHeight = 0;
+		glfwGetFramebufferSize(window.Get(), &displayWidth, &displayHeight);
+		glViewport(0, 0, displayWidth, displayHeight);
+		glClearColor(kClearColor[0], kClearColor[1], kClearColor[2], kClearColor[3]);
+		glClear(GL_COLOR_BUFFER_BIT);
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-                if (ImGui::ImageButton(("Image " + std::to_string(i)).c_str(), ImTextureID(textures[i].GetId()), ImVec2(PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight)))
-                {
-                    currentIndex = i;
-                }
-                if (placed % 3 != 2)
-                {
-                    ImGui::SameLine();
-                }
-                ++placed;
-            }
-            placed = 0;
-            ImGui::End();
-            
-            // Show the image viewer window with the current image index and scale.
-            ImGui::Begin("Viewer");
+		glfwSwapBuffers(window.Get());
+	}
 
-            if (ImGui::SliderInt("Scale", &scale, 1, 8))
-            {
-                scaledSize = ImVec2(PocketCameraConverter::kImageWidth * scale, PocketCameraConverter::kImageHeight * scale);
-            }
-            ImGui::Image(ImTextureID(textures[currentIndex].GetId()), scaledSize);
-            ImGui::End();
-
-            ImGui::Render();
-
-            int display_w, display_h;
-            glfwGetFramebufferSize(window, &display_w, &display_h);
-            glViewport(0, 0, display_w, display_h);
-            glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-            glfwSwapBuffers(window);
-        }
-    }
-
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    return 0;
+	return 0;
 }

@@ -121,7 +121,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
@@ -140,19 +140,33 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>opengl32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AppContext.cpp" />
+    <ClCompile Include="AppUI.cpp" />
+    <ClCompile Include="ImageExporter.cpp" />
+    <ClCompile Include="Palette.cpp" />
+    <ClCompile Include="PhotoLibrary.cpp" />
     <ClCompile Include="PocketCameraEditor.cpp" />
     <ClCompile Include="PocketCameraConverter.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="Win98Style.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AppContext.h" />
+    <ClInclude Include="AppState.h" />
+    <ClInclude Include="AppUI.h" />
+    <ClInclude Include="ImageExporter.h" />
+    <ClInclude Include="Palette.h" />
+    <ClInclude Include="PhotoLibrary.h" />
     <ClInclude Include="PocketCameraConverter.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="Win98Style.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

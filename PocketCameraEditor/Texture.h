@@ -8,17 +8,17 @@
 
 class Texture
 {
-    public:
-        Texture() = default;
-        ~Texture();
-        Texture(const Texture&) = delete;               // Disable copy constructor
-        Texture& operator=(const Texture&) = delete;    // Disable copy assignment operator
-        Texture(Texture&&) noexcept;                    // Move constructor
-        Texture& operator=(Texture&&) noexcept;         // Move assignment operator
+public:
+	Texture() = default;
+	~Texture();
+	Texture(const Texture&) = delete;               // Disable copy constructor
+	Texture& operator=(const Texture&) = delete;    // Disable copy assignment operator
+	Texture(Texture&&) noexcept;                    // Move constructor
+	Texture& operator=(Texture&&) noexcept;         // Move assignment operator
 
-        void Upload(std::span<const uint8_t> pixels, int width, int height);
-        GLuint GetId() const { return m_textureId; }
+	void Upload(std::span<const uint8_t> pixels, int width, int height);
+	GLuint GetId() const { return m_textureId; }
 
-    private:
-        GLuint m_textureId = 0;
+private:
+	GLuint m_textureId = 0;
 };
