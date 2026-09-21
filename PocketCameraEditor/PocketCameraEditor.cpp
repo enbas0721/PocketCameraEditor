@@ -31,13 +31,11 @@ int main()
 	int currentIndex = 0;
 	int saveScale = 4;
 	const ImVec2 kViewerScaledSize = ImVec2(PocketCameraConverter::kImageWidth * 4, PocketCameraConverter::kImageHeight * 4);
-	
-	PhotoLibrary library;
 
 	char saveStatus[256] = "";
 	std::string currentFilePath = "No file loaded.";
 
-	bool hide_deleted = false;
+	bool hideDeleted = false;
 
 	glfwSetErrorCallback(glfw_error_callback);
 	if (!glfwInit())
@@ -90,6 +88,7 @@ int main()
 
 	// Prepare the textures and index buffers for all images.
 	{
+		PhotoLibrary library;
 		/**************************************
 		 * Main loop
 		 **************************************/
@@ -136,27 +135,61 @@ int main()
 				ImGui::Text("Current File: %s", currentFilePath.c_str());
 				
 				if (library.IsLoaded()) {
-					ImGui::Checkbox("Hide Deleted", &hide_deleted);
+					if (ImGui::Button("Select All"))
+					{
+						for (int i = 0; i < library.SlotCount(); i++)
+						{
+							Slot& slot = library.GetSlot(i);
+							slot.isSelected = true;
+						}
+					}
+					if (ImGui::Button("Deselect All"))
+					{
+						for (int i = 0; i < library.SlotCount(); i++)
+						{
+							Slot& slot = library.GetSlot(i);
+							slot.isSelected = false;
+						}
+					}
+					ImGui::Checkbox("Hide Deleted", &hideDeleted);
 					for (int i = 0; i < library.SlotCount(); ++i)
 					{
 						Slot& slot = library.GetSlot(i);
 						// Skip rendering invalid images.
-						if (hide_deleted && !library.IsSlotActive(i))
+						if (hideDeleted && !library.IsSlotActive(i))
 						{
 							continue;
 						}
-						snprintf(textImageButton, std::size(textImageButton), "Image %d", i);
-						if (ImGui::ImageButton(textImageButton, ImTextureID(slot.texture.GetId()), ImVec2(PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight)))
+
+						ImGui::BeginGroup();
 						{
-							currentIndex = i;
-						}
-						if (currentIndex == i)
-						{
+
+							const ImVec2 slotPos = ImGui::GetCursorScreenPos();
+							snprintf(textImageButton, std::size(textImageButton), "Image %d", i);
+						
+							ImGui::SetNextItemAllowOverlap();
+							if (ImGui::ImageButton(textImageButton, ImTextureID(slot.texture.GetId()), ImVec2(PocketCameraConverter::kImageWidth, PocketCameraConverter::kImageHeight)))
+							{
+								currentIndex = i;
+							}
+						
 							const ImVec2 imageButtonMin = ImGui::GetItemRectMin();
 							const ImVec2 imageButtonMax = ImGui::GetItemRectMax();
-							ImDrawList* drawList = ImGui::GetWindowDrawList();
-							drawList->AddRect(imageButtonMin, imageButtonMax, IM_COL32(66, 150, 250, 255), 0.0f, 0, 5.0f);
+
+							char checkboxId[16];
+							snprintf(checkboxId, std::size(checkboxId), "##chk%d", i);
+							ImGui::SetCursorScreenPos(ImVec2(slotPos.x + 4.0f, slotPos.y + 4.0f));
+							ImGui::Checkbox(checkboxId, &slot.isSelected);
+
+							// Draw a blue border around the currently selected image button.
+							if (currentIndex == i)
+							{
+								ImDrawList* drawList = ImGui::GetWindowDrawList();
+								drawList->AddRect(imageButtonMin, imageButtonMax, IM_COL32(66, 150, 250, 255), 0.0f, 0, 5.0f);
+							}
 						}
+						ImGui::EndGroup();
+
 						if (placed % 3 != 2)
 						{
 							ImGui::SameLine();
@@ -165,7 +198,7 @@ int main()
 					}
 				}
 			}
-			ImGui::End();
+			ImGui::End(); // Library Window
 
 			if (library.IsLoaded())
 			{
@@ -174,7 +207,7 @@ int main()
 				{
 					ImGui::Image(ImTextureID(library.GetSlot(currentIndex).texture.GetId()), kViewerScaledSize);
 				}
-				ImGui::End();
+				ImGui::End();	// Viewer Window
 
 				ImGui::Begin("Info");
 				{
@@ -189,7 +222,7 @@ int main()
 						ImGui::Text("Image slot display order: %d", displayOrder + 1);
 					}
 				}
-				ImGui::End();
+				ImGui::End();	// Info Window
 
 				ImGui::Begin("Palette");
 				{
@@ -213,17 +246,17 @@ int main()
 						}
 						ImGui::EndCombo();
 					}
-					changed |= ImGui::ColorEdit3("Shade 0 (lightest)", slot.palette.colors[0]);
-					changed |= ImGui::ColorEdit3("Shade 1", slot.palette.colors[1]);
-					changed |= ImGui::ColorEdit3("Shade 2", slot.palette.colors[2]);
-					changed |= ImGui::ColorEdit3("Shade 3 (darkest)", slot.palette.colors[3]);
+					changed |= ImGui::ColorEdit3("Shade 0 (lightest)", slot.palette.colors[0], ImGuiColorEditFlags_PickerHueWheel);
+					changed |= ImGui::ColorEdit3("Shade 1", slot.palette.colors[1], ImGuiColorEditFlags_PickerHueWheel);
+					changed |= ImGui::ColorEdit3("Shade 2", slot.palette.colors[2], ImGuiColorEditFlags_PickerHueWheel);
+					changed |= ImGui::ColorEdit3("Shade 3 (darkest)", slot.palette.colors[3], ImGuiColorEditFlags_PickerHueWheel);
 
 					if (changed)
 					{
 						library.RefreshTexture(currentIndex);
 					}
 				}
-				ImGui::End();
+				ImGui::End();	// Palette Window
 
 				ImGui::Begin("Export Setting");
 				{
@@ -251,7 +284,8 @@ int main()
 								saveScale
 							);
 							if (!finalImage.pixels.empty()) {
-								if (!SavePng(outPath.get(), finalImage)) {
+								std::filesystem::path savePath = reinterpret_cast<const char8_t*>(outPath.get());
+								if (!SavePng(savePath, finalImage)) {
 									snprintf(saveStatus, sizeof(saveStatus), "Error: Failed to Save Image: %s", outPath.get());
 								}
 								else
@@ -272,13 +306,57 @@ int main()
 							snprintf(saveStatus, sizeof(saveStatus), "Error: %s", NFD::GetError());
 						}
 					}
+					if (ImGui::Button("Save All Selected"))
+					{
+						int savedCount = 0;
+						int selectedCount = 0;
+						NFD::UniquePath outPath;
+						nfdresult_t result = NFD::PickFolder(outPath);
+						if (result == NFD_OKAY)
+						{
+							std::filesystem::path folderPath(reinterpret_cast<const char8_t*>(outPath.get()));
+							for (int i = 0; i < library.SlotCount(); ++i)
+							{
+								Slot& slot = library.GetSlot(i);
+								if (slot.isSelected)
+								{
+									selectedCount++;
+									std::vector<uint8_t> saveData = ApplyPalette(slot.indices, slot.palette);
+									ExportImage finalImage = UpscaleNearest(
+										saveData,
+										PocketCameraConverter::kImageWidth,
+										PocketCameraConverter::kImageHeight,
+										saveScale
+									);
+									if (!finalImage.pixels.empty())
+									{
+										std::filesystem::path savePath = folderPath / std::format("slot_{:02d}_x{}.png", i + 1, saveScale);
+										if (SavePng(savePath, finalImage))
+										{
+											savedCount++;
+										}
+									}
+								}
+							}
+							snprintf(saveStatus, sizeof(saveStatus), "Saved %d/%d images to folder: %s", savedCount, selectedCount, outPath.get());
+						}
+						else if (result == NFD_CANCEL)
+						{
+							// User canceled the folder selection dialog, do nothing.
+						}
+						else if (result == NFD_ERROR)
+						{
+							snprintf(saveStatus, sizeof(saveStatus), "Error: %s", NFD::GetError());
+						}
+					}
+
 					if (saveStatus[0] != '\0')
 					{
 						ImGui::Text("%s", saveStatus);
 					}
 
 				}
-				ImGui::End();
+				ImGui::End();	// Export Setting Window
 			}
 
 			ImGui::Render();

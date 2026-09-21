@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <span>
+#include <filesystem>
 
 struct ExportImage
 {
@@ -13,4 +14,4 @@ struct ExportImage
 ExportImage UpscaleNearest(std::span<const uint8_t> src, int srcWidth, int srcHeight, int scale);
 
 // Save the image as a PNG file.
-bool SavePng(char const *filename, const ExportImage& image);
+bool SavePng(const std::filesystem::path& path, const ExportImage& image);

@@ -13,6 +13,7 @@ struct Slot
 	Texture texture;
 	Palette palette;
 	int presetId = 0;
+	bool isSelected = false;
 };
 
 class PhotoLibrary

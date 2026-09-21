@@ -44,11 +44,12 @@ ExportImage UpscaleNearest(std::span<const uint8_t> src, int srcWidth, int srcHe
 	return result;
 }
 
-bool SavePng(char const *filename, const ExportImage& image)
+bool SavePng(const std::filesystem::path& path, const ExportImage& image)
 {
 	if (image.pixels.size() != static_cast<size_t>(image.width) * image.height * 4)
 		return false;
 
 	// comp = 4, stride_bytes = 0 (default, auto)
-	return stbi_write_png(filename, image.width, image.height, 4, image.pixels.data(), 0) != 0;
+	const std::u8string u8path = path.u8string();
+	return stbi_write_png(reinterpret_cast<const char*>(u8path.c_str()), image.width, image.height, 4, image.pixels.data(), 0) != 0;
 }
