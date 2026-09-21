@@ -147,6 +147,8 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AppContext.cpp" />
+    <ClCompile Include="AppUI.cpp" />
     <ClCompile Include="ImageExporter.cpp" />
     <ClCompile Include="Palette.cpp" />
     <ClCompile Include="PhotoLibrary.cpp" />
@@ -156,6 +158,9 @@
     <ClCompile Include="Win98Style.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AppContext.h" />
+    <ClInclude Include="AppState.h" />
+    <ClInclude Include="AppUI.h" />
     <ClInclude Include="ImageExporter.h" />
     <ClInclude Include="Palette.h" />
     <ClInclude Include="PhotoLibrary.h" />
