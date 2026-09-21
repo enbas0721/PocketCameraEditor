@@ -153,6 +153,7 @@
     <ClCompile Include="PocketCameraEditor.cpp" />
     <ClCompile Include="PocketCameraConverter.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="Win98Style.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImageExporter.h" />
@@ -160,6 +161,7 @@
     <ClInclude Include="PhotoLibrary.h" />
     <ClInclude Include="PocketCameraConverter.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="Win98Style.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

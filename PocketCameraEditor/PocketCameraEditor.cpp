@@ -6,6 +6,7 @@
 #include "Palette.h"
 #include "ImageExporter.h"
 #include "PhotoLibrary.h"
+#include "Win98Style.h"
 #include <glad/glad.h>
 
 #define GLFW_INCLUDE_NONE
@@ -78,13 +79,14 @@ int main()
 	ImGuiIO& io = ImGui::GetIO();
 	(void)io;
 
-	ImGui::StyleColorsDark();
+	ApplyWin98Style();
 
 	// Function for Initializeing ImGui backends.
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
-	ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
+	// The classic Windows 98 desktop teal.
+	ImVec4 clear_color = ImVec4(0.0f, 0.502f, 0.502f, 1.0f);
 
 	// Prepare the textures and index buffers for all images.
 	{
@@ -132,7 +134,6 @@ int main()
 						fprintf(stderr, "Error: %s\n", NFD::GetError());
 					}
 				}
-				ImGui::Text("Current File: %s", currentFilePath.c_str());
 				
 				if (library.IsLoaded()) {
 					if (ImGui::Button("Select All"))
