@@ -17,7 +17,6 @@
 namespace
 {
 	constexpr int kThumbnailsPerRow = 3;
-	constexpr int kViewerScale = 4;
 
 	// NFDe hands back UTF-8, but std::filesystem::path reads a plain char* using
 	// the system's narrow code page. Going through char8_t keeps non-ASCII paths
@@ -154,8 +153,8 @@ namespace
 		ImGui::Begin("Viewer");
 		{
 			const ImVec2 size(
-				static_cast<float>(PocketCameraConverter::kImageWidth * kViewerScale),
-				static_cast<float>(PocketCameraConverter::kImageHeight * kViewerScale));
+				static_cast<float>(PocketCameraConverter::kImageWidth * app.exportScale),
+				static_cast<float>(PocketCameraConverter::kImageHeight * app.exportScale));
 			ImGui::Image(ImTextureID(app.library.GetSlot(app.currentIndex).texture.GetId()), size);
 		}
 		ImGui::End();
